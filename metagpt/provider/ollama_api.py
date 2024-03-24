@@ -34,7 +34,7 @@ class OllamaLLM(BaseLLM):
         self.pricing_plan = self.model
 
     def _const_kwargs(self, messages: list[dict], stream: bool = False) -> dict:
-        kwargs = {"model": self.model, "messages": messages, "options": {"temperature": 0.3}, "stream": stream}
+        kwargs = {"model": self.model, "messages": messages, "options": {"temperature": 0.3}, "stream": False}
         return kwargs
 
     def get_choice_text(self, resp: dict) -> str:
@@ -66,6 +66,16 @@ class OllamaLLM(BaseLLM):
         return await self._achat_completion(messages, timeout=self.get_timeout(timeout))
 
     async def _achat_completion_stream(self, messages: list[dict], timeout: int = USE_CONFIG_TIMEOUT) -> str:
+        resp, _, _ = await self.client.arequest(
+            method=self.http_method,
+            url=self.suffix_url,
+            params=self._const_kwargs(messages),
+            request_timeout=self.get_timeout(timeout),
+        )
+        resp = resp.decode("utf-8")
+        usage = self.get_usage(json.loads(resp))
+        self._update_costs(usage)
+        return resp
         stream_resp, _, _ = await self.client.arequest(
             method=self.http_method,
             url=self.suffix_url,
