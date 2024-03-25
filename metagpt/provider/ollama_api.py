@@ -3,7 +3,7 @@
 # @Desc   : self-host open llm model with ollama which isn't openai-api-compatible
 
 import json
-
+import re
 from metagpt.configs.llm_config import LLMConfig, LLMType
 from metagpt.const import USE_CONFIG_TIMEOUT
 from metagpt.logs import log_llm_stream
@@ -48,6 +48,7 @@ class OllamaLLM(BaseLLM):
 
     def _decode_and_load(self, chunk: bytes, encoding: str = "utf-8") -> dict:
         chunk = chunk.decode(encoding)
+        chunk = self.parse_json_str(chunk)
         return json.loads(chunk)
 
     async def _achat_completion(self, messages: list[dict], timeout: int = USE_CONFIG_TIMEOUT) -> dict:
@@ -73,6 +74,7 @@ class OllamaLLM(BaseLLM):
             request_timeout=self.get_timeout(timeout),
         )
         resp = resp.decode("utf-8")
+        resp = self.parse_json_str(resp)
         usage = self.get_usage(json.loads(resp))
         self._update_costs(usage)
         return resp
@@ -101,3 +103,16 @@ class OllamaLLM(BaseLLM):
         self._update_costs(usage)
         full_content = "".join(collected_content)
         return full_content
+    def parse_json_str(self, s: str) -> str:
+        # 定位 JSON 开始和结束的位置
+        start = s.find('{')
+        end = s.rfind('}') + 1  # '+1' 要包括 '}' 这个字符本身
+
+        # 提取 JSON 字符串
+        json_str = s[start:end]
+
+        # 使用正则表达式删除注释
+        json_str = re.sub(r"//.*?(\n|$)", r"\1", json_str)
+
+        print(json_str)
+        return json_str
